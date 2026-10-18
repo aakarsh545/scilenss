@@ -1,0 +1,4 @@
+*.test.mjs
+data
+.playwright-cli
+.git

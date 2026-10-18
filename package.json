@@ -1,10 +1,10 @@
 {
-  "name": "akarsh-portfolio-webild",
+  "name": "orbital-gravity",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check app.js && node --check server.mjs"
+    "check": "node --check server.mjs && node --check accounts.js && node --check orbit-physics.js && node --check orbit.js && node --check orbit-properties.js && node orbit-physics.test.mjs && node orbit-properties.test.mjs && node accounts.test.mjs"
   }
 }
