@@ -13,13 +13,16 @@ import {
   insertionPlacement,
   insertionVelocity,
   integrate,
-  orbitAbout,
   removeBody,
   setVelocity,
   worldFromSnapshot,
 } from "./orbit-physics.js"
 import { REGISTRY_VERSION, coverage, evaluate } from "./orbit-properties.js"
+import { currentUser, request } from "./auth.js"
+import { earthGlobe, earthSpin, isEarthBody } from "./earth-globe.js"
+import { drawSphere, mix, withAlpha } from "./body-visuals.js"
 
+const globe = earthGlobe()
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
 const AIM_PIXELS = 140
 const KITS = [
@@ -223,13 +226,6 @@ function formatAngle(radians) {
   const arcsec = degrees * 3600
   if (Math.abs(arcsec) >= 0.01) return `${arcsec.toPrecision(3)} arcsec`
   return degrees === 0 ? "0 deg" : `${(arcsec * 1000).toPrecision(3)} mas`
-}
-
-function formatOrbit(orbit) {
-  if (!orbit) return "no partner"
-  const eccentricity = orbit.eccentricity < 0.0005 ? "circular" : `e ${orbit.eccentricity.toFixed(orbit.eccentricity < 0.1 ? 4 : 3)}`
-  if (!orbit.bound) return `unbound, ${eccentricity}`
-  return `${eccentricity}, ${formatLength(orbit.semiMajor)}`
 }
 
 function formatDrift(drift) {
@@ -576,23 +572,6 @@ function makeStars(width, height, dpr) {
   return field
 }
 
-function hexChannels(hex) {
-  const value = Number.parseInt(hex.slice(1), 16)
-  return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
-}
-
-function mix(hex, toward, amount) {
-  const [r, g, b] = hexChannels(hex)
-  const [tr, tg, tb] = hexChannels(toward)
-  const channel = (from, to) => Math.round(from + (to - from) * amount)
-  return `rgb(${channel(r, tr)} ${channel(g, tg)} ${channel(b, tb)})`
-}
-
-function withAlpha(hex, alpha) {
-  const [r, g, b] = hexChannels(hex)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
 const KIND_LABEL = {
   comet: "Comet",
   asteroid: "Asteroid",
@@ -622,13 +601,7 @@ function updateReadout(liveSpeed) {
   brushEl.textContent = `${preset.name}, ${formatMass(preset.gm)}, ${preset.kind === "blackhole" ? formatLength((2 * preset.gm) / (CONST.C ** 2)) : formatLength(preset.radius)}`
   inspect.hidden = !selected
   if (selected) {
-    const orbit = orbitAbout(selected, world.bodies)
     document.querySelector("#inspect-name").textContent = selected.name
-    document.querySelector("#inspect-kind").textContent = KIND_LABEL[selected.kind] ?? selected.kind
-    document.querySelector("#inspect-mass").textContent = formatMass(selected.gm)
-    document.querySelector("#inspect-size").textContent = formatLength(selected.radius)
-    document.querySelector("#inspect-orbit").textContent = formatOrbit(orbit)
-    document.querySelector("#inspect-period").textContent = orbit?.period ? `${formatSimTime(orbit.period)}, ${orbit.primary}` : "unbound"
   }
   syncWarp()
   if (liveSpeed) {
@@ -885,17 +858,6 @@ function drawTrail(body) {
   ctx.globalAlpha = 1
 }
 
-function drawSphere(x, y, radius, color) {
-  const shade = ctx.createRadialGradient(x - radius * 0.35, y - radius * 0.38, radius * 0.08, x, y, radius)
-  shade.addColorStop(0, mix(color, "#ffffff", 0.42))
-  shade.addColorStop(0.62, color)
-  shade.addColorStop(1, mix(color, "#090a0d", 0.45))
-  ctx.fillStyle = shade
-  ctx.beginPath()
-  ctx.arc(x, y, radius, 0, Math.PI * 2)
-  ctx.fill()
-}
-
 function drawAtmosphere(screen, radius, color, kind) {
   if (kind !== "planet" && kind !== "giant") return
   const haze = ctx.createRadialGradient(screen.x, screen.y, radius * 0.96, screen.x, screen.y, radius * 1.16)
@@ -947,6 +909,18 @@ function drawCometTail(body, screen, size) {
   ctx.stroke()
 }
 
+function earthLight(body) {
+  const sun = world.bodies.find((other) => other.kind === "star" || other.kind === "giantstar")
+  if (!sun) return { x: -0.22, y: 0.18, z: 0.96 }
+  const from = worldToScreen(body.x, body.y)
+  const to = worldToScreen(sun.x, sun.y)
+  const x = to.x - from.x
+  const y = from.y - to.y
+  const length = Math.hypot(x, y)
+  if (!(length > 1)) return { x: -0.22, y: 0.18, z: 0.96 }
+  return { x: x / length, y: (y / length) * 0.38, z: 0.64 }
+}
+
 function drawBody(body, now) {
   const screen = worldToScreen(body.x, body.y)
   const size = drawRadius(body)
@@ -973,8 +947,14 @@ function drawBody(body, now) {
     ctx.beginPath()
     ctx.arc(screen.x, screen.y, size.marker ? size.draw + 3.5 : Math.max(size.physical * 1.5, size.draw + 2), 0, Math.PI * 2)
     ctx.stroke()
+  } else if (isEarthBody(body) && globe.draw(ctx, screen.x, screen.y, size.draw, {
+    rotation: earthSpin(world.time, reducedMotion.matches),
+    clouds: reducedMotion.matches ? 0.04 : (world.time / 140000) % (Math.PI * 2),
+    light: earthLight(body),
+  })) {
+    // NASA maps and atmosphere live in the globe shader.
   } else {
-    drawSphere(screen.x, screen.y, size.draw, body.color)
+    drawSphere(ctx, screen.x, screen.y, size.draw, body.color)
     if (body.kind === "planet" || body.kind === "giant") drawAtmosphere(screen, size.draw, body.color, body.kind)
   }
 
@@ -1587,6 +1567,10 @@ trailsEl.addEventListener("click", () => {
 fitEl.addEventListener("click", () => fitWorld())
 document.querySelector("#physics").addEventListener("click", () => setSheetOpen(!sheetOpen))
 document.querySelector("#inspect-more").addEventListener("click", () => setSheetOpen(true))
+document.querySelector("#inspect-hide").addEventListener("click", () => {
+  selectedId = null
+  updateReadout()
+})
 document.querySelector("#sheet-close").addEventListener("click", () => setSheetOpen(false))
 clearEl.addEventListener("click", () => {
   sceneEl.value = "empty"
@@ -1629,11 +1613,6 @@ function bindWarp() {
 }
 
 function bindAccount() {
-  const authForm = document.querySelector("#auth-form")
-  const sessionEl = document.querySelector("#session")
-  const emailEl = document.querySelector("#auth-email")
-  const passwordEl = document.querySelector("#auth-password")
-  const authError = document.querySelector("#auth-error")
   const sessionEmail = document.querySelector("#session-email")
   const projectForm = document.querySelector("#project-form")
   const projectName = document.querySelector("#project-name")
@@ -1657,18 +1636,6 @@ function bindAccount() {
 
   function showError(node, error) {
     node.textContent = error instanceof Error ? error.message : String(error ?? "")
-  }
-
-  async function request(path, options = {}) {
-    const response = await fetch(path, {
-      method: options.method ?? "GET",
-      headers: options.body ? { "Content-Type": "application/json" } : undefined,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    })
-    const text = await response.text()
-    const body = text ? JSON.parse(text) : null
-    if (!response.ok) throw new Error(body?.error || "The account request failed.")
-    return body
   }
 
   function renderProjects() {
@@ -1715,25 +1682,10 @@ function bindAccount() {
   }
 
   function showSession(email) {
-    authForm.hidden = true
-    sessionEl.hidden = false
     sessionEmail.textContent = email
     accountToggle.textContent = email.slice(0, 1).toUpperCase()
     accountToggle.title = email
     accountToggle.setAttribute("aria-label", `Account, ${email}`)
-    authError.textContent = ""
-  }
-
-  function showAuth() {
-    authForm.hidden = false
-    sessionEl.hidden = true
-    sessionEmail.textContent = ""
-    accountToggle.textContent = "Me"
-    accountToggle.setAttribute("aria-label", "Account")
-    accountToggle.removeAttribute("title")
-    projects = []
-    projectList.replaceChildren()
-    passwordEl.value = ""
   }
 
   async function loadProjects() {
@@ -1743,53 +1695,30 @@ function bindAccount() {
     renderProjects()
   }
 
-  authForm.addEventListener("submit", async (event) => {
-    event.preventDefault()
-    authError.textContent = ""
-    try {
-      const body = await request("/api/login", {
-        method: "POST",
-        body: { email: emailEl.value, password: passwordEl.value },
-      })
-      passwordEl.value = ""
-      showSession(body.email)
-      await loadProjects()
-      setStatus(`Signed in as ${body.email}.`)
-    } catch (error) {
-      showError(authError, error)
-    }
-  })
-
-  document.querySelector("#auth-create").addEventListener("click", async () => {
-    if (!authForm.reportValidity()) return
-    authError.textContent = ""
-    try {
-      const body = await request("/api/signup", {
-        method: "POST",
-        body: { email: emailEl.value, password: passwordEl.value },
-      })
-      passwordEl.value = ""
-      showSession(body.email)
-      projects = []
-      renderProjects()
-      setStatus(`Account created for ${body.email}.`)
-    } catch (error) {
-      showError(authError, error)
-    }
-  })
+  function showDemo(email) {
+    showSession(email)
+    document.querySelector(".account__hint").firstChild.textContent = "Demo session for "
+    const actions = projectForm.querySelector(".account__actions")
+    actions.querySelector('button[type="submit"]')?.remove()
+    projectForm.replaceChildren(actions)
+    const notice = document.createElement("li")
+    notice.className = "projects__empty"
+    notice.textContent = "Demo only. Projects aren't saved."
+    projectList.append(notice)
+    setStatus("Demo playground. Pick a world and give it a push.")
+  }
 
   document.querySelector("#sign-out").addEventListener("click", async () => {
     projectError.textContent = ""
     try {
       await request("/api/logout", { method: "POST" })
-      showAuth()
-      setStatus("Signed out. Projects stay saved for that email.")
+      window.location.replace("/")
     } catch (error) {
       showError(projectError, error)
     }
   })
 
-  projectForm.addEventListener("submit", async (event) => {
+  const saveProject = async (event) => {
     event.preventDefault()
     projectError.textContent = ""
     try {
@@ -1806,9 +1735,19 @@ function bindAccount() {
     } catch (error) {
       showError(projectError, error)
     }
-  })
+  }
 
-  request("/api/me")
-    .then((body) => loadProjects().then(() => setStatus(`Signed in as ${body.email}.`)))
-    .catch(() => showAuth())
+  currentUser().then((user) => {
+    if (!user) {
+      window.location.replace("/login")
+      return
+    }
+    document.documentElement.dataset.gate = "open"
+    if (user.demo) {
+      showDemo(user.email)
+      return
+    }
+    projectForm.addEventListener("submit", saveProject)
+    loadProjects().then(() => setStatus(`Signed in as ${user.email}.`))
+  })
 }

@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check accounts.js && node --check orbit-physics.js && node --check orbit.js && node --check orbit-properties.js && node orbit-physics.test.mjs && node orbit-properties.test.mjs && node accounts.test.mjs"
+    "check": "node --check server.mjs && node --check accounts.js && node --check auth.js && node --check sky.js && node --check landing.js && node --check login.js && node --check earth-globe.js && node --check orbit-physics.js && node --check orbit.js && node --check orbit-properties.js && node --check blackhole.js && node --check schwarzschild.js && node --check orbit-camera.js && node --check orbit-placement.js && node --check blackhole-mass.js && node schwarzschild.test.mjs && node orbit-camera.test.mjs && node orbit-placement.test.mjs && node blackhole-mass.test.mjs && node demo-auth.test.mjs && node orbit-physics.test.mjs && node orbit-properties.test.mjs && node accounts.test.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "^10.1.7"
   }
 }

@@ -73,6 +73,35 @@ try {
   const bob = client(base)
   const sunEarth = snapshotOf("sun-earth")
 
+  const home = await fetch(`${base}/`)
+  const homeHtml = await home.text()
+  assert(home.status === 200 && homeHtml.includes("See how it works"), "the landing page is the front door")
+  const loginPage = await fetch(`${base}/login`)
+  assert((await loginPage.text()).includes("Demo sign-in. No account is created."), "the login page identifies demo access")
+  for (const path of ["/orbit", "/orbit/", "/orbit.html"]) {
+    const locked = await fetch(`${base}${path}`, { redirect: "manual" })
+    const lockedHtml = await locked.text()
+    assert(locked.status === 302 && locked.headers.get("location") === "/login" && !lockedHtml.includes("Black-hole coordinate view"), `${path} sends a visitor without a session to sign-in`)
+  }
+  const forged = await fetch(`${base}/orbit`, { redirect: "manual", headers: { cookie: "orbit_session=d1.eyJlIjoieEB5LnoiLCJ4Ijo5OTk5OTk5OTk5OTk5fQ.forged" } })
+  assert(forged.status === 302, "a forged session cookie does not open the field")
+
+  const demo = await fetch(`${base}/api/demo-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "Anyone@Example.com", password: "x" }),
+  })
+  const demoCookie = (demo.headers.get("set-cookie") ?? "").split(";")[0]
+  assert(demo.status === 200 && demoCookie.startsWith("orbit_session=d1."), "demo sign-in accepts any email and password")
+  const field = await fetch(`${base}/orbit`, { headers: { cookie: demoCookie } })
+  assert(field.status === 200 && (await field.text()).includes("Black-hole coordinate view"), "a demo session opens the field")
+  const demoMe = await (await fetch(`${base}/api/me`, { headers: { cookie: demoCookie } })).json()
+  assert(demoMe.email === "anyone@example.com" && demoMe.demo === true, "the demo session is marked as a demo")
+  const demoSave = await fetch(`${base}/api/projects`, { headers: { cookie: demoCookie } })
+  assert(demoSave.status === 401, "a demo session cannot reach saved projects")
+  const demoOut = await fetch(`${base}/api/logout`, { method: "POST", headers: { cookie: demoCookie } })
+  assert((demoOut.headers.get("set-cookie") ?? "").includes("Max-Age=0"), "demo sign-out clears the cookie")
+
   const created = await ada("/api/signup", {
     method: "POST",
     body: { email: "Ada@Example.com", password: "orbit-pass" },

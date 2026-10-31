@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Explore a black hole in three dimensions. Launch probes into relativistic orbits and watch their clocks." />
+    <meta name="theme-color" content="#090a0d" />
+    <title>scilenss · A gravity playground</title>
+    <link rel="preload" href="./assets/fonts/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="./site.css" />
+  </head>
+  <body class="landing">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <canvas id="sky" aria-hidden="true"></canvas>
+    <div class="haze" aria-hidden="true"></div>
+    <header class="top" id="top">
+      <a class="mark" href="/" translate="no">scilenss</a>
+      <div class="top__aside">
+        <span class="top__note">A gravity playground</span>
+        <button class="sky-toggle" id="sky-toggle" type="button" aria-controls="sky" hidden>Pause animation</button>
+      </div>
+    </header>
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__copy">
+          <h1 id="hero-title">Make a little<br />cosmic chaos.</h1>
+          <p>Orbit a black hole. Launch a probe. Explore what curved spacetime sets in motion.</p>
+          <div class="hero__actions">
+            <a class="go" id="enter" href="/login">Sign in</a>
+            <a class="hero__about" href="#playground">See how it works</a>
+          </div>
+        </div>
+      </section>
+      <section class="playground" id="playground" aria-labelledby="playground-title" tabindex="-1">
+        <div class="playground__intro">
+          <h2 id="playground-title">Space to experiment.</h2>
+          <p>A Schwarzschild black-hole sandbox. Explore relativistic probe trajectories from any angle.</p>
+        </div>
+        <ol class="playground__steps">
+          <li>
+            <h3>Choose an orbit.</h3>
+            <p>Start with precession, inclined circles, or a plunge toward the horizon.</p>
+          </li>
+          <li>
+            <h3>Give it a push.</h3>
+            <p>Launch a test probe with a velocity measured by a local hovering observer.</p>
+          </li>
+          <li>
+            <h3>Change your perspective.</h3>
+            <p>Pan, tilt, and zoom around three-dimensional paths through curved spacetime.</p>
+          </li>
+        </ol>
+      </section>
+    </main>
+    <footer class="landing-footer">
+      <span>A little space to play.</span>
+      <a href="#top">Back to top</a>
+    </footer>
+    <script type="module" src="./landing.js"></script>
+  </body>
+</html>

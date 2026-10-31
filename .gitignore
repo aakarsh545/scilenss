@@ -1,5 +1,9 @@
 .DS_Store
+node_modules/
+.playwright-mcp/
 .playwright-cli/
 data/
 .vercel/
 .vercel
+.earth-fetch/
+graphify-out/
