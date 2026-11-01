@@ -1,4 +1,4 @@
-import { currentUser, request } from "./auth.js"
+import { currentUser, normalizeGmail, request } from "./auth.js"
 
 const form = document.querySelector("#auth-form")
 const email = document.querySelector("#auth-email")
@@ -13,11 +13,20 @@ currentUser().then((user) => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault()
   error.textContent = ""
+  let address
+  try {
+    address = normalizeGmail(email.value)
+  } catch (cause) {
+    error.textContent = cause.message
+    email.setAttribute("aria-invalid", "true")
+    email.focus()
+    return
+  }
   submit.disabled = true
   try {
     await request("/api/demo-login", {
       method: "POST",
-      body: { email: email.value, password: password.value },
+      body: { email: address, password: password.value },
     })
     form.reset()
     window.location.replace("/orbit")

@@ -86,17 +86,23 @@ try {
   const forged = await fetch(`${base}/orbit`, { redirect: "manual", headers: { cookie: "orbit_session=d1.eyJlIjoieEB5LnoiLCJ4Ijo5OTk5OTk5OTk5OTk5fQ.forged" } })
   assert(forged.status === 302, "a forged session cookie does not open the field")
 
+  const notGmail = await fetch(`${base}/api/demo-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "anyone@example.com", password: "x" }),
+  })
+  assert(notGmail.status === 400 && !(notGmail.headers.get("set-cookie") ?? "").includes("d1."), "demo sign-in refuses a non-Gmail address")
   const demo = await fetch(`${base}/api/demo-login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "Anyone@Example.com", password: "x" }),
+    body: JSON.stringify({ email: "Anyone@Gmail.com", password: "x" }),
   })
   const demoCookie = (demo.headers.get("set-cookie") ?? "").split(";")[0]
-  assert(demo.status === 200 && demoCookie.startsWith("orbit_session=d1."), "demo sign-in accepts any email and password")
+  assert(demo.status === 200 && demoCookie.startsWith("orbit_session=d1."), "demo sign-in accepts a Gmail address and any password")
   const field = await fetch(`${base}/orbit`, { headers: { cookie: demoCookie } })
   assert(field.status === 200 && (await field.text()).includes("Black-hole coordinate view"), "a demo session opens the field")
   const demoMe = await (await fetch(`${base}/api/me`, { headers: { cookie: demoCookie } })).json()
-  assert(demoMe.email === "anyone@example.com" && demoMe.demo === true, "the demo session is marked as a demo")
+  assert(demoMe.email === "anyone@gmail.com" && demoMe.demo === true, "the demo session is marked as a demo")
   const demoSave = await fetch(`${base}/api/projects`, { headers: { cookie: demoCookie } })
   assert(demoSave.status === 401, "a demo session cannot reach saved projects")
   const demoOut = await fetch(`${base}/api/logout`, { method: "POST", headers: { cookie: demoCookie } })

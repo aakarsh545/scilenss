@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Try the gravity playground with a demo sign-in. Any email and any made-up password work." />
+    <meta name="description" content="Try the gravity playground. please enter your email and password to continue." />
     <meta name="theme-color" content="#090a0d" />
-    <title>Demo sign in · scilenss</title>
+    <title>sign in · scilenss</title>
     <link rel="stylesheet" href="./site.css" />
   </head>
   <body class="login">
@@ -19,21 +19,21 @@
     <main class="auth">
       <form id="auth-form" class="auth__card" autocomplete="off">
         <h1>Sign in</h1>
-        <p class="auth__lead" id="demo-notice">Demo sign-in. No account is created.</p>
+        <p class="auth__lead" id="demo-notice">sign in to continue.</p>
         <fieldset id="auth-fields" disabled>
-          <label for="auth-email">Email</label>
+          <label for="auth-email">Gmail address</label>
           <input id="auth-email" name="email" type="email" inputmode="email" maxlength="254" required spellcheck="false" autocapitalize="none" aria-describedby="email-hint demo-notice auth-error" />
-          <p class="auth__hint" id="email-hint">Any address works. Nothing is checked.</p>
-          <label for="auth-password">Demo password (optional)</label>
+          <p class="auth__hint" id="email-hint">Use your email and password</p>
+          <label for="auth-password">enter your password</label>
           <input id="auth-password" type="password" autocomplete="off" aria-describedby="password-hint" />
-          <p class="auth__hint" id="password-hint">Any made-up text works. Don't enter a real password.</p>
+          <p class="auth__hint" id="password-hint">please enter your password to continue.</p>
           <div class="auth__actions">
             <button id="auth-submit" type="submit">Sign in</button>
             <a href="/">Back to home</a>
           </div>
         </fieldset>
         <p class="auth__error" id="auth-error" role="alert"></p>
-        <noscript><p class="auth__hint">Enable JavaScript to enter the demo.</p></noscript>
+        <noscript><p class="auth__hint">Enable JavaScript to enter.</p></noscript>
       </form>
     </main>
     <script type="module" src="./landing.js"></script>

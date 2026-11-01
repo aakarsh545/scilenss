@@ -1,7 +1,24 @@
 import assert from "node:assert/strict"
-import { currentUser } from "./auth.js"
+import { currentUser, normalizeGmail } from "./auth.js"
+import { signDemo } from "./demo-session.mjs"
+import proxy from "./proxy.js"
 
 const originalFetch = globalThis.fetch
+
+assert.equal(normalizeGmail("  Ada.Lovelace+demo@GMAIL.COM  "), "ada.lovelace+demo@gmail.com", "Gmail addresses are normalized")
+for (const email of ["", "ada@example.com", "ada@gmail.com.evil.test", "ada@@gmail.com", "@gmail.com", "ada lovelace@gmail.com", ".ada@gmail.com", "ada..lovelace@gmail.com", "ada.@gmail.com"]) {
+  assert.throws(() => normalizeGmail(email), /valid @gmail\.com/, `invalid address rejected: ${email}`)
+}
+console.log("ok  only @gmail.com addresses can sign in")
+
+const gate = (cookie) => proxy(new Request("https://scilenss.vercel.app/orbit", cookie ? { headers: { cookie } } : {}))
+const locked = gate()
+assert.equal(locked.status, 302, "the proxy stops a visitor with no session")
+assert.equal(locked.headers.get("location"), "/login", "the proxy sends them to sign in")
+assert.equal(gate("orbit_session=d1.eyJlIjoieEBnbWFpbC5jb20iLCJ4Ijo5OTk5OTk5OTk5OTk5fQ.forged").status, 302, "the proxy rejects a forged cookie")
+const open = gate(`orbit_session=${encodeURIComponent(signDemo("ada@gmail.com"))}`)
+assert.equal(open.headers.get("x-middleware-next"), "1", "the proxy lets a signed-in visitor through")
+console.log("ok  the Vercel proxy gates the field")
 
 try {
   globalThis.fetch = async (path) => {

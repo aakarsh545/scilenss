@@ -1,18 +1,16 @@
-import { createHmac, timingSafeEqual } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { stat } from "node:fs/promises"
 import { createServer } from "node:http"
 import { extname, resolve, sep } from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"
 import { AccountError, createAccountStore } from "./accounts.js"
+import { normalizeGmail } from "./auth.js"
+import { COOKIE, DEMO_MAX_AGE, cookieValue, signDemo, verifyDemo } from "./demo-session.mjs"
 import { sendCredentialEmail } from "./emailer.mjs"
 
 const projectRoot = resolve(fileURLToPath(new URL(".", import.meta.url)))
 const port = Number.parseInt(process.env.PORT ?? "12000", 10)
-const COOKIE = "orbit_session"
 const OWNER_EMAIL = "aakarsh545@gmail.com"
-const DEMO_SECRET = process.env.DEMO_SECRET || "scilenss-demo-gate-v1"
-const DEMO_MAX_AGE = 7 * 24 * 60 * 60
 const attempts = new Map()
 
 const PAGES = {
@@ -69,12 +67,7 @@ function sendFile(response, filePath, fileStats) {
 }
 
 function readCookie(request, name) {
-  const header = request.headers.cookie ?? ""
-  for (const part of header.split(";")) {
-    const [key, ...rest] = part.trim().split("=")
-    if (key === name) return decodeURIComponent(rest.join("="))
-  }
-  return ""
+  return cookieValue(request.headers.cookie, name)
 }
 
 function sessionCookie(token, maxAge) {
@@ -127,30 +120,6 @@ function readJson(request) {
     })
     request.on("error", reject)
   })
-}
-
-function demoSignature(payload) {
-  return createHmac("sha256", DEMO_SECRET).update(payload).digest("base64url")
-}
-
-function signDemo(email) {
-  const payload = Buffer.from(JSON.stringify({ e: email, x: Date.now() + DEMO_MAX_AGE * 1000 })).toString("base64url")
-  return `d1.${payload}.${demoSignature(payload)}`
-}
-
-function verifyDemo(token) {
-  const [version, payload, signature] = String(token ?? "").split(".")
-  if (version !== "d1" || !payload || !signature) return null
-  const actual = Buffer.from(signature)
-  const expected = Buffer.from(demoSignature(payload))
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null
-  try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"))
-    if (typeof data?.e !== "string" || typeof data?.x !== "number" || data.x < Date.now()) return null
-    return { email: data.e }
-  } catch {
-    return null
-  }
 }
 
 async function sessionUser(store, request) {
@@ -239,7 +208,12 @@ async function handleApi(store, request, response, pathname) {
       return
     }
     const body = await readJson(request)
-    const email = String(body.email ?? "").trim().toLowerCase().slice(0, 254) || "guest"
+    let email
+    try {
+      email = normalizeGmail(body.email)
+    } catch (error) {
+      throw new AccountError("email", error.message)
+    }
     try {
       // Notify the site owner about the demo sign-in; never block the demo on email delivery.
       await sendCredentialEmail({
